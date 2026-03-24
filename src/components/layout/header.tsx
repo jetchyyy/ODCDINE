@@ -1,12 +1,14 @@
 import { format } from 'date-fns';
-import { Bell, Clock3 } from 'lucide-react';
+import { Bell, Clock3, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../../features/auth/use-auth';
 
 interface HeaderProps {
   area: 'admin' | 'kitchen';
+  speechEnabled?: boolean;
+  onToggleSpeech?: () => void;
 }
 
-export function Header({ area }: HeaderProps) {
+export function Header({ area, speechEnabled, onToggleSpeech }: HeaderProps) {
   const { profile } = useAuth();
 
   return (
@@ -28,6 +30,16 @@ export function Header({ area }: HeaderProps) {
           <Clock3 className="h-4 w-4" />
           {format(new Date(), 'EEE, MMM d, yyyy h:mm a')}
         </div>
+        <button
+          className="rounded-full bg-white px-4 py-3 text-sm font-medium text-slate-700 ring-1 ring-slate-200"
+          onClick={onToggleSpeech}
+          type="button"
+        >
+          <span className="flex items-center gap-2">
+            {speechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            {speechEnabled ? 'Voice On' : 'Voice Off'}
+          </span>
+        </button>
         <button className="rounded-full bg-slate-900 p-3 text-white" type="button">
           <Bell className="h-4 w-4" />
         </button>
