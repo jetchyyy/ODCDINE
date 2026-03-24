@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '../../components/ui/empty-state';
-import { useBusinessSettings, useCreatePublicOrder } from '../../hooks/use-dashboard-queries';
+import { useBusinessSettings, useCreatePublicOrder, usePublicTableContext } from '../../hooks/use-dashboard-queries';
 import { formatCurrency } from '../../lib/utils/currency';
 import { getErrorMessage } from '../../lib/utils/error';
 import { calculateCartPreview } from '../../services/supabase/queries';
@@ -10,6 +10,7 @@ export function CartPage() {
   const navigate = useNavigate();
   const { tableCode = '' } = useParams();
   const { data: business } = useBusinessSettings();
+  const { data: tableContext } = usePublicTableContext(tableCode);
   const items = useCartStore((state) => state.items);
   const orderNote = useCartStore((state) => state.orderNote);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
@@ -19,6 +20,9 @@ export function CartPage() {
   const createOrderMutation = useCreatePublicOrder();
 
   const totals = calculateCartPreview(items, business ?? null);
+  const tableLabel = tableContext?.table.tableNumber
+    ? `Table ${tableContext.table.tableNumber}${tableContext.table.tableName ? `: ${tableContext.table.tableName}` : ''}`
+    : tableContext?.table.tableName ?? 'Your table';
 
   async function handlePlaceOrder() {
     if (!tableCode || items.length === 0) {
@@ -53,7 +57,7 @@ export function CartPage() {
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="glass-panel p-5 md:p-6">
           <p className="text-xs uppercase tracking-[0.3em] text-amber-700">Cart</p>
-          <h1 className="mt-3 text-3xl font-semibold text-slate-900">Table {tableCode}</h1>
+          <h1 className="mt-3 text-3xl font-semibold text-slate-900">{tableLabel}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Review your items, add per-item instructions, then place the order for this table.
           </p>
