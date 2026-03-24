@@ -932,6 +932,23 @@ export async function upsertOrderPayment(input: {
   } satisfies Payment;
 }
 
+export async function deleteOrders(orderIds: string[]) {
+  if (orderIds.length === 0) {
+    return 0;
+  }
+
+  const client = requireSupabase();
+  const { data, error } = await client.rpc('admin_delete_orders', {
+    p_order_ids: orderIds,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return Number(data ?? 0);
+}
+
 export async function createStaff(input: { email: string; password: string; fullName: string; role: StaffProfile['role'] }) {
   const client = requireSupabase();
   const { data, error } = await client.functions.invoke('manage-staff', {

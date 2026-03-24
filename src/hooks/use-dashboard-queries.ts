@@ -7,6 +7,7 @@ import {
   createStaffOrder,
   createStaff,
   createTable,
+  deleteOrders,
   fetchAnalytics,
   fetchBusinessSettings,
   fetchCategories,
@@ -329,6 +330,28 @@ export function useUpsertOrderPayment() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.order(payment.orderId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.publicOrder(payment.orderId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.analytics });
+    },
+  });
+}
+
+export function useDeleteOrders() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderIds: string[]) => deleteOrders(orderIds),
+    onSuccess: async (_deletedCount, orderIds) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.orders });
+      await queryClient.invalidateQueries({ queryKey: ['sales'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.analytics });
+      await queryClient.invalidateQueries({ queryKey: ['order'] });
+      await queryClient.invalidateQueries({ queryKey: ['public-order'] });
+
+      await Promise.all(
+        orderIds.map(async (orderId) => {
+          await queryClient.removeQueries({ queryKey: queryKeys.order(orderId) });
+          await queryClient.removeQueries({ queryKey: queryKeys.publicOrder(orderId) });
+        }),
+      );
     },
   });
 }

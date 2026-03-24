@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { OrderStatusActions } from '../../components/orders/order-status-actions';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { EmptyState } from '../../components/ui/empty-state';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { PageHeader } from '../../components/ui/page-header';
 import { StatusBadge } from '../../components/ui/status-badge';
-import { useUpsertOrderPayment, useOrder, useUpdateOrderStatus } from '../../hooks/use-dashboard-queries';
+import { useDeleteOrders, useUpsertOrderPayment, useOrder, useUpdateOrderStatus } from '../../hooks/use-dashboard-queries';
 import { useAuth } from '../../features/auth/use-auth';
 import { useOrderRealtime } from '../../hooks/use-order-realtime';
 import { formatCurrency } from '../../lib/utils/currency';
@@ -13,17 +14,22 @@ import { getErrorMessage } from '../../lib/utils/error';
 
 export function AdminOrderDetailsPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const statusMutation = useUpdateOrderStatus();
   const paymentMutation = useUpsertOrderPayment();
+  const deleteOrdersMutation = useDeleteOrders();
   const { data: order, isLoading } = useOrder(id);
   useOrderRealtime({ orderId: id });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'gcash'>('cash');
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const canManagePayment = profile?.role === 'admin' || profile?.role === 'cashier';
+  const canDeleteOrders = profile?.role === 'admin';
 
   useEffect(() => {
     if (!order?.payment) {
@@ -66,6 +72,18 @@ export function AdminOrderDetailsPage() {
       });
     } catch (error) {
       setPaymentError(getErrorMessage(error, 'Unable to save payment.'));
+    }
+  }
+
+  async function handleDeleteOrder() {
+    setDeleteError(null);
+
+    try {
+      await deleteOrdersMutation.mutateAsync([currentOrder.id]);
+      void navigate('/admin/orders');
+    } catch (error) {
+      setDeleteError(getErrorMessage(error, 'Unable to delete order.'));
+      setDeleteDialogOpen(false);
     }
   }
 
@@ -227,8 +245,40 @@ export function AdminOrderDetailsPage() {
               ))}
             </div>
           </div>
+
+          {canDeleteOrders ? (
+            <div className="glass-panel p-5">
+              <h3 className="text-lg font-semibold text-slate-900">Danger Zone</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Deleting this order will also remove its items, payment record, and status history.
+              </p>
+              <button
+                className="mt-4 rounded-full bg-rose-600 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+                disabled={deleteOrdersMutation.isPending}
+                onClick={() => setDeleteDialogOpen(true)}
+                type="button"
+              >
+                {deleteOrdersMutation.isPending ? 'Deleting...' : 'Delete order'}
+              </button>
+              {deleteError ? <p className="mt-3 text-sm text-rose-600">{deleteError}</p> : null}
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <ConfirmDialog
+        cancelLabel="Keep order"
+        confirmLabel="Delete order"
+        confirmTone="danger"
+        description={`Delete ${currentOrder.orderNumber}? This cannot be undone.`}
+        isOpen={deleteDialogOpen}
+        isPending={deleteOrdersMutation.isPending}
+        onCancel={() => setDeleteDialogOpen(false)}
+        onConfirm={() => {
+          void handleDeleteOrder();
+        }}
+        title="Delete this order?"
+      />
     </div>
   );
 }

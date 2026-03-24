@@ -38,3 +38,33 @@ end;
 $$;
 
 grant execute on function public.staff_update_order_status(uuid, order_status) to authenticated;
+
+create or replace function public.admin_delete_orders(p_order_ids uuid[])
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role app_role;
+  v_deleted_count integer := 0;
+begin
+  select public.current_app_role() into v_role;
+
+  if v_role is distinct from 'admin' then
+    raise exception 'Only admin accounts can delete orders.';
+  end if;
+
+  if p_order_ids is null or array_length(p_order_ids, 1) is null then
+    return 0;
+  end if;
+
+  delete from public.orders
+  where id = any(p_order_ids);
+
+  get diagnostics v_deleted_count = row_count;
+  return v_deleted_count;
+end;
+$$;
+
+grant execute on function public.admin_delete_orders(uuid[]) to authenticated;

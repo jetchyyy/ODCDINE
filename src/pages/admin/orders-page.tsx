@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { CategoryTabs } from '../../components/menu/category-tabs';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { DataTable } from '../../components/ui/data-table';
 import { EmptyState } from '../../components/ui/empty-state';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { PageHeader } from '../../components/ui/page-header';
 import { StatusBadge } from '../../components/ui/status-badge';
-import { useBusinessSettings, useCategories, useCreateStaffOrder, useMenuItems, usePagedOrders, useTables } from '../../hooks/use-dashboard-queries';
+import { useDeleteOrders, useBusinessSettings, useCategories, useCreateStaffOrder, useMenuItems, usePagedOrders, useTables } from '../../hooks/use-dashboard-queries';
+import { useAuth } from '../../features/auth/use-auth';
 import { useOrderRealtime } from '../../hooks/use-order-realtime';
 import { ORDER_STATUSES } from '../../lib/constants/app';
 import { formatCurrency } from '../../lib/utils/currency';
@@ -302,12 +304,14 @@ function ManualMenuPickerModal({
 export function AdminOrdersPage() {
   const PAGE_SIZE_OPTIONS = [10, 25, 50];
   const navigate = useNavigate();
+  const { profile } = useAuth();
   useOrderRealtime();
   const { data: tables = [] } = useTables();
   const { data: categories = [] } = useCategories({ activeOnly: true });
   const { data: menuItems = [] } = useMenuItems({ activeOnly: true });
   const { data: business } = useBusinessSettings();
   const createStaffOrderMutation = useCreateStaffOrder();
+  const deleteOrdersMutation = useDeleteOrders();
   const [statusFilter, setStatusFilter] = useState<'all' | Order['status']>('all');
   const [tableFilter, setTableFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -318,6 +322,9 @@ export function AdminOrdersPage() {
   const [manualOrderError, setManualOrderError] = useState<string | null>(null);
   const [menuPickerOpen, setMenuPickerOpen] = useState(false);
   const [manualReceipt, setManualReceipt] = useState<ManualOrderReceipt | null>(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const pagedOrdersQuery = usePagedOrders({
     page,
     pageSize,
@@ -339,6 +346,24 @@ export function AdminOrdersPage() {
   const totalPages = pagedOrdersQuery.data?.totalPages ?? 0;
   const pageStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageEnd = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
+  const canDeleteOrders = profile?.role === 'admin';
+  const pageOrderIds = pagedOrders.map((order) => order.id);
+  const allPageOrdersSelected = pageOrderIds.length > 0 && pageOrderIds.every((orderId) => selectedOrderIds.includes(orderId));
+  const selectedCount = selectedOrderIds.length;
+
+  useEffect(() => {
+    setSelectedOrderIds((currentIds) => currentIds.filter((orderId) => pageOrderIds.includes(orderId)));
+  }, [pageOrderIds]);
+
+  useEffect(() => {
+    if (page > 1 && totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    }
+
+    if (totalPages === 0 && page !== 1) {
+      setPage(1);
+    }
+  }, [page, totalPages]);
 
   function addManualItem(menuItem: MenuItem) {
     setManualItems((currentItems) => {
@@ -410,6 +435,43 @@ export function AdminOrdersPage() {
       });
     } catch (error) {
       setManualOrderError(getErrorMessage(error, 'Unable to create manual order.'));
+    }
+  }
+
+  function toggleOrderSelection(orderId: string) {
+    setSelectedOrderIds((currentIds) =>
+      currentIds.includes(orderId) ? currentIds.filter((currentId) => currentId !== orderId) : [...currentIds, orderId],
+    );
+  }
+
+  function toggleSelectAllPageOrders() {
+    setSelectedOrderIds((currentIds) => {
+      if (allPageOrdersSelected) {
+        return currentIds.filter((orderId) => !pageOrderIds.includes(orderId));
+      }
+
+      return [...new Set([...currentIds, ...pageOrderIds])];
+    });
+  }
+
+  async function handleDeleteOrders() {
+    if (deleteTargetIds.length === 0) {
+      return;
+    }
+
+    setDeleteError(null);
+
+    try {
+      await deleteOrdersMutation.mutateAsync(deleteTargetIds);
+      setSelectedOrderIds((currentIds) => currentIds.filter((orderId) => !deleteTargetIds.includes(orderId)));
+      setDeleteTargetIds([]);
+
+      if (deleteTargetIds.length >= pagedOrders.length && page > 1) {
+        setPage((currentPage) => Math.max(1, currentPage - 1));
+      }
+    } catch (error) {
+      setDeleteError(getErrorMessage(error, 'Unable to delete the selected order(s).'));
+      setDeleteTargetIds([]);
     }
   }
 
@@ -599,7 +661,19 @@ export function AdminOrdersPage() {
             </option>
           ))}
         </select>
+        {canDeleteOrders ? (
+          <button
+            className="rounded-full bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            disabled={selectedCount === 0 || deleteOrdersMutation.isPending}
+            onClick={() => setDeleteTargetIds(selectedOrderIds)}
+            type="button"
+          >
+            Delete selected ({selectedCount})
+          </button>
+        ) : null}
       </div>
+
+      {deleteError ? <p className="text-sm text-rose-600">{deleteError}</p> : null}
 
       {pagedOrdersQuery.isLoading ? <LoadingSpinner label="Loading orders..." /> : null}
 
@@ -608,6 +682,32 @@ export function AdminOrdersPage() {
         getRowKey={(row) => row.id}
         emptyState={<EmptyState title="No orders found" description="Orders will appear here as soon as customers place them from table QR codes." />}
         columns={[
+          ...(canDeleteOrders
+            ? [
+                {
+                  key: 'select',
+                  header: (
+                    <input
+                      aria-label="Select all orders on this page"
+                      checked={allPageOrdersSelected}
+                      className="h-4 w-4 rounded border-slate-300"
+                      onChange={toggleSelectAllPageOrders}
+                      type="checkbox"
+                    />
+                  ),
+                  render: (order: Order) => (
+                    <input
+                      aria-label={`Select order ${order.orderNumber}`}
+                      checked={selectedOrderIds.includes(order.id)}
+                      className="h-4 w-4 rounded border-slate-300"
+                      onChange={() => toggleOrderSelection(order.id)}
+                      type="checkbox"
+                    />
+                  ),
+                  className: 'w-12',
+                },
+              ]
+            : []),
           {
             key: 'order',
             header: 'Order',
@@ -645,6 +745,23 @@ export function AdminOrdersPage() {
           { key: 'notes', header: 'Notes', render: (order) => order.notes ?? 'No notes' },
           { key: 'items', header: 'Items', render: (order) => `${order.items.length} item(s)` },
           { key: 'total', header: 'Total', render: (order) => formatCurrency(order.total) },
+          ...(canDeleteOrders
+            ? [
+                {
+                  key: 'actions',
+                  header: 'Actions',
+                  render: (order: Order) => (
+                    <button
+                      className="rounded-full bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+                      onClick={() => setDeleteTargetIds([order.id])}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -692,6 +809,23 @@ export function AdminOrdersPage() {
           setManualReceipt(null);
           void navigate(`/admin/orders/${orderId}`);
         }}
+      />
+      <ConfirmDialog
+        cancelLabel="Keep orders"
+        confirmLabel={deleteTargetIds.length > 1 ? `Delete ${deleteTargetIds.length} orders` : 'Delete order'}
+        confirmTone="danger"
+        description={
+          deleteTargetIds.length > 1
+            ? `Delete ${deleteTargetIds.length} selected orders? Their items, payments, and status logs will also be removed.`
+            : 'Delete this order? Its items, payment, and status history will also be removed.'
+        }
+        isOpen={deleteTargetIds.length > 0}
+        isPending={deleteOrdersMutation.isPending}
+        onCancel={() => setDeleteTargetIds([])}
+        onConfirm={() => {
+          void handleDeleteOrders();
+        }}
+        title={deleteTargetIds.length > 1 ? 'Delete selected orders?' : 'Delete this order?'}
       />
     </div>
   );
