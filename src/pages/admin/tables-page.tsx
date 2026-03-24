@@ -18,6 +18,11 @@ const defaultValues: TableFormValues = {
   isActive: true,
 };
 
+function getPublicSiteUrl() {
+  const configuredUrl = import.meta.env.VITE_PUBLIC_SITE_URL?.trim();
+  return configuredUrl && configuredUrl.length > 0 ? configuredUrl.replace(/\/+$/, '') : window.location.origin;
+}
+
 function downloadQrForTable(table: RestaurantTable, qrUrl: string) {
   const canvas = document.createElement('canvas');
   const size = 640;
@@ -55,6 +60,7 @@ function downloadQrForTable(table: RestaurantTable, qrUrl: string) {
 }
 
 export function AdminTablesPage() {
+  const publicSiteUrl = getPublicSiteUrl();
   const { data = [] } = useTables();
   const createTableMutation = useCreateTable();
   const updateTableMutation = useUpdateTable();
@@ -146,7 +152,7 @@ export function AdminTablesPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {data.length > 0 ? (
             data.map((table) => {
-              const qrUrl = `${window.location.origin}/menu/${table.tableCode}`;
+              const qrUrl = `${publicSiteUrl}/menu/${table.tableCode}`;
               return (
                 <div key={table.id} onMouseEnter={() => setSelectedTableId(table.id)}>
                   <TableCard
@@ -156,7 +162,7 @@ export function AdminTablesPage() {
                     onToggleActive={(value) => {
                       void toggleMutation.mutateAsync({ tableId: value.id, isActive: !value.isActive });
                     }}
-                    onDownload={(value) => downloadQrForTable(value, `${window.location.origin}/menu/${value.tableCode}`)}
+                    onDownload={(value) => downloadQrForTable(value, `${publicSiteUrl}/menu/${value.tableCode}`)}
                   />
                 </div>
               );
@@ -168,7 +174,7 @@ export function AdminTablesPage() {
         <div className="space-y-4">
           {selectedTable ? (
             <>
-              <QRCodePreview value={`${window.location.origin}/menu/${selectedTable.tableCode}`} title={`${selectedTable.tableName} QR`} />
+              <QRCodePreview value={`${publicSiteUrl}/menu/${selectedTable.tableCode}`} title={`${selectedTable.tableName} QR`} />
               <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white" onClick={() => window.print()} type="button">
                 Print QR sheet
               </button>
