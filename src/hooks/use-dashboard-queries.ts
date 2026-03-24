@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../lib/constants/query-keys';
 import {
   createCategory,
   createMenuItem,
   createPublicOrder,
+  createStaffOrder,
   createStaff,
   createTable,
   fetchAnalytics,
@@ -12,6 +13,8 @@ import {
   fetchMenuItems,
   fetchOrderById,
   fetchOrders,
+  fetchPagedOrders,
+  fetchPagedSales,
   fetchPublicOrder,
   fetchPublicTableContext,
   fetchStaff,
@@ -21,6 +24,7 @@ import {
   toggleTableActive,
   updateCategory,
   updateMenuItem,
+  upsertOrderPayment,
   updateOrderStatus,
   updateStaffRole,
   updateTable,
@@ -72,6 +76,42 @@ export function useOrders() {
   });
 }
 
+export function usePagedOrders(options: {
+  page: number;
+  pageSize: number;
+  status?: OrderStatus | 'all';
+  tableId?: string;
+}) {
+  return useQuery({
+    queryKey: queryKeys.pagedOrders({
+      page: options.page,
+      pageSize: options.pageSize,
+      status: options.status ?? 'all',
+      tableId: options.tableId ?? 'all',
+    }),
+    queryFn: () => fetchPagedOrders(options),
+    placeholderData: keepPreviousData,
+    refetchInterval: 3_000,
+  });
+}
+
+export function usePagedSales(options: {
+  page: number;
+  pageSize: number;
+  tableId?: string;
+}) {
+  return useQuery({
+    queryKey: queryKeys.pagedSales({
+      page: options.page,
+      pageSize: options.pageSize,
+      tableId: options.tableId ?? 'all',
+    }),
+    queryFn: () => fetchPagedSales(options),
+    placeholderData: keepPreviousData,
+    refetchInterval: 3_000,
+  });
+}
+
 export function useOrder(orderId?: string) {
   return useQuery({
     queryKey: queryKeys.order(String(orderId)),
@@ -118,6 +158,13 @@ export function useCreatePublicOrder() {
   });
 }
 
+export function useCreateStaffOrder() {
+  return useMutation({
+    mutationFn: ({ tableId, items, notes }: { tableId?: string | null; items: CartLine[]; notes?: string }) =>
+      createStaffOrder({ tableId, items, notes }),
+  });
+}
+
 export function useUploadMenuItemImage() {
   return useMutation({
     mutationFn: uploadMenuItemImage,
@@ -141,6 +188,7 @@ export function useUpsertBusinessSettings() {
       taxRate: number;
       serviceChargeRate: number;
       currency: string;
+      queueResetAfter: number;
       logoUrl?: string | null;
       openingHours: OpeningHours;
     }) => upsertBusinessSettings(values),
@@ -266,6 +314,21 @@ export function useUpdateOrderStatus() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.analytics });
       await queryClient.invalidateQueries({ queryKey: queryKeys.order(variables.orderId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.publicOrder(variables.orderId) });
+    },
+  });
+}
+
+export function useUpsertOrderPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: upsertOrderPayment,
+    onSuccess: async (payment) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.orders });
+      await queryClient.invalidateQueries({ queryKey: ['sales'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.order(payment.orderId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.publicOrder(payment.orderId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.analytics });
     },
   });
 }

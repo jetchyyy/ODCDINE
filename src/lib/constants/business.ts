@@ -10,6 +10,7 @@ export const defaultBusinessSettings: BusinessSettings = {
   taxRate: 0.12,
   serviceChargeRate: 0.1,
   currency: 'PHP',
+  queueResetAfter: 50,
   openingHours: defaultOpeningHours,
   createdAt: new Date(0).toISOString(),
   updatedAt: new Date(0).toISOString(),

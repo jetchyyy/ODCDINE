@@ -3,6 +3,7 @@ import type { StaffRole } from '../../types/domain';
 export const adminNavigation: Array<{ to: string; label: string; roles?: StaffRole[] }> = [
   { to: '/admin/dashboard', label: 'Dashboard', roles: ['admin', 'cashier', 'kitchen', 'waiter'] },
   { to: '/admin/orders', label: 'Orders', roles: ['admin', 'cashier', 'kitchen', 'waiter'] },
+  { to: '/admin/sales', label: 'Sales', roles: ['admin', 'cashier'] },
   { to: '/admin/menu/categories', label: 'Categories', roles: ['admin'] },
   { to: '/admin/menu/items', label: 'Menu Items', roles: ['admin'] },
   { to: '/admin/tables', label: 'Tables', roles: ['admin'] },

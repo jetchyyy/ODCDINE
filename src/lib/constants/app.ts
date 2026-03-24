@@ -12,6 +12,7 @@ export const ORDER_STATUSES: OrderStatus[] = [
 ];
 export const ACTIVE_KITCHEN_STATUSES: OrderStatus[] = ['confirmed', 'preparing', 'ready_to_serve'];
 export const ADMIN_ONLY_ROLES: StaffRole[] = ['admin'];
+export const SALES_PORTAL_ROLES: StaffRole[] = ['admin', 'cashier'];
 export const ORDER_MANAGEMENT_ROLES: StaffRole[] = ['admin', 'cashier', 'kitchen', 'waiter'];
 export const STAFF_PORTAL_ROLES: StaffRole[] = ['admin', 'cashier', 'kitchen', 'waiter'];
 export const MENU_IMAGE_BUCKET = 'menu-images';

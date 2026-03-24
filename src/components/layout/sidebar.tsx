@@ -14,6 +14,7 @@ interface SidebarProps {
 const iconMap: Record<string, ReactNode> = {
   Dashboard: <LayoutGrid className="h-4 w-4" />,
   Orders: <ReceiptText className="h-4 w-4" />,
+  Sales: <BarChart3 className="h-4 w-4" />,
   Categories: <SquareMenu className="h-4 w-4" />,
   'Menu Items': <SquareMenu className="h-4 w-4" />,
   Tables: <QrCode className="h-4 w-4" />,

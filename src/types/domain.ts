@@ -33,6 +33,7 @@ export interface BusinessSettings {
   taxRate: number;
   serviceChargeRate: number;
   currency: string;
+  queueResetAfter: number;
   openingHours: OpeningHours;
   createdAt: string;
   updatedAt: string;
@@ -118,17 +119,18 @@ export interface Payment {
 
 export interface Order {
   id: string;
-  tableId: string;
+  tableId?: string | null;
   tableName: string;
   tableNumber?: number;
   orderNumber: string;
+  queueNumber?: string | null;
   status: OrderStatus;
   subtotal: number;
   taxAmount: number;
   serviceChargeAmount: number;
   total: number;
   notes?: string | null;
-  source: 'qr';
+  source: 'qr' | 'staff';
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];

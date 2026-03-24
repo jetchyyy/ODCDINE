@@ -24,6 +24,20 @@ import type { CartLine } from '../../store/cart-store';
 
 type SupabaseRow = Record<string, unknown>;
 
+export interface PagedOrdersResult {
+  orders: Order[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface StaffOrderResult {
+  orderId: string;
+  orderNumber: string;
+  queueNumber?: string | null;
+}
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error('Supabase environment variables are missing.');
@@ -61,6 +75,7 @@ function mapBusinessSettings(row: SupabaseRow): BusinessSettings {
     taxRate: Number(row.tax_rate ?? 0),
     serviceChargeRate: Number(row.service_charge_rate ?? 0),
     currency: String(row.currency ?? 'PHP'),
+    queueResetAfter: Number(row.queue_reset_after ?? 50),
     openingHours: normalizeOpeningHours(row.opening_hours),
     createdAt: String(row.created_at ?? new Date().toISOString()),
     updatedAt: String(row.updated_at ?? new Date().toISOString()),
@@ -156,17 +171,18 @@ function mapOrder(row: SupabaseRow): Order {
 
   return {
     id: String(row.id),
-    tableId: String(row.table_id),
-    tableName: String(table?.table_name ?? 'Unknown Table'),
+    tableId: (row.table_id as string | null | undefined) ?? null,
+    tableName: String(table?.table_name ?? (row.source === 'staff' ? 'Walk-in / No table' : 'Unknown Table')),
     tableNumber: table?.table_number ? Number(table.table_number) : undefined,
     orderNumber: String(row.order_number ?? ''),
+    queueNumber: (row.queue_number as string | null | undefined) ?? null,
     status: row.status as OrderStatus,
     subtotal: Number(row.subtotal ?? 0),
     taxAmount: Number(row.tax_amount ?? 0),
     serviceChargeAmount: Number(row.service_charge_amount ?? 0),
     total: Number(row.total ?? 0),
     notes: (row.notes as string | null | undefined) ?? null,
-    source: 'qr',
+    source: (row.source as Order['source'] | undefined) ?? 'qr',
     createdAt: String(row.created_at ?? new Date().toISOString()),
     updatedAt: String(row.updated_at ?? new Date().toISOString()),
     items: maybeArray(row.order_items).map((item) => mapOrderItem(item as SupabaseRow)),
@@ -384,6 +400,108 @@ export async function fetchOrders() {
   return (data ?? []).map((row) => mapOrder(row as SupabaseRow));
 }
 
+export async function fetchPagedOrders(input: {
+  page: number;
+  pageSize: number;
+  status?: OrderStatus | 'all';
+  tableId?: string;
+}): Promise<PagedOrdersResult> {
+  const client = requireSupabase();
+  const safePage = Math.max(1, input.page);
+  const safePageSize = Math.max(1, input.pageSize);
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
+
+  let query = client
+    .from('orders')
+    .select('*, tables(table_name, table_number), order_items(*), order_status_logs(*, profiles(full_name)), payments(*)', {
+      count: 'exact',
+    })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (input.status && input.status !== 'all') {
+    query = query.eq('status', input.status);
+  }
+
+  if (input.tableId && input.tableId !== 'all') {
+    query = query.eq('table_id', input.tableId);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    if (isPermissionError(error)) {
+      return {
+        orders: [],
+        totalCount: 0,
+        page: safePage,
+        pageSize: safePageSize,
+        totalPages: 0,
+      };
+    }
+    throw error;
+  }
+
+  const totalCount = count ?? 0;
+  return {
+    orders: (data ?? []).map((row) => mapOrder(row as SupabaseRow)),
+    totalCount,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages: totalCount > 0 ? Math.ceil(totalCount / safePageSize) : 0,
+  };
+}
+
+export async function fetchPagedSales(input: {
+  page: number;
+  pageSize: number;
+  tableId?: string;
+}): Promise<PagedOrdersResult> {
+  const client = requireSupabase();
+  const safePage = Math.max(1, input.page);
+  const safePageSize = Math.max(1, input.pageSize);
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
+
+  let query = client
+    .from('orders')
+    .select('*, tables(table_name, table_number), order_items(*), payments!inner(*)', {
+      count: 'exact',
+    })
+    .eq('payments.payment_status', 'paid')
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (input.tableId && input.tableId !== 'all') {
+    query = query.eq('table_id', input.tableId);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    if (isPermissionError(error)) {
+      return {
+        orders: [],
+        totalCount: 0,
+        page: safePage,
+        pageSize: safePageSize,
+        totalPages: 0,
+      };
+    }
+    throw error;
+  }
+
+  const totalCount = count ?? 0;
+  return {
+    orders: (data ?? []).map((row) => mapOrder(row as SupabaseRow)),
+    totalCount,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages: totalCount > 0 ? Math.ceil(totalCount / safePageSize) : 0,
+  };
+}
+
 export async function fetchOrderById(orderId: string) {
   const client = requireSupabase();
   const { data, error } = await client
@@ -491,6 +609,36 @@ export async function createPublicOrder(tableCode: string, items: CartLine[], no
   };
 }
 
+export async function createStaffOrder(input: {
+  tableId?: string | null;
+  items: CartLine[];
+  notes?: string;
+}): Promise<StaffOrderResult> {
+  const client = requireSupabase();
+  const payload = input.items.map((item) => ({
+    menu_item_id: item.menuItem.id,
+    quantity: item.quantity,
+    notes: item.notes ?? null,
+  }));
+
+  const { data, error } = await client.rpc('create_staff_order', {
+    p_table_id: input.tableId ?? null,
+    p_items: payload,
+    p_notes: input.notes ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  return {
+    orderId: String(result.order_id),
+    orderNumber: String(result.order_number),
+    queueNumber: (result.queue_number as string | null | undefined) ?? null,
+  };
+}
+
 export async function upsertBusinessSettings(input: {
   businessName: string;
   contactNumber: string;
@@ -498,6 +646,7 @@ export async function upsertBusinessSettings(input: {
   taxRate: number;
   serviceChargeRate: number;
   currency: string;
+  queueResetAfter: number;
   logoUrl?: string | null;
   openingHours: OpeningHours;
 }) {
@@ -515,6 +664,7 @@ export async function upsertBusinessSettings(input: {
     tax_rate: input.taxRate,
     service_charge_rate: input.serviceChargeRate,
     currency: input.currency.toUpperCase(),
+    queue_reset_after: input.queueResetAfter,
     logo_url: input.logoUrl ?? null,
     opening_hours: input.openingHours ?? defaultOpeningHours,
   };
@@ -743,6 +893,43 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   if (error) {
     throw error;
   }
+}
+
+export async function upsertOrderPayment(input: {
+  orderId: string;
+  paymentMethod: 'cash' | 'gcash';
+  paymentStatus: 'pending' | 'paid';
+  amountPaid: number;
+  referenceNumber?: string | null;
+}) {
+  const client = requireSupabase();
+  const payload = {
+    order_id: input.orderId,
+    payment_method: input.paymentMethod,
+    payment_status: input.paymentStatus,
+    amount_paid: input.amountPaid,
+    reference_number: input.paymentMethod === 'gcash' ? input.referenceNumber ?? null : null,
+  };
+
+  const { data, error } = await client
+    .from('payments')
+    .upsert(payload, { onConflict: 'order_id' })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    id: String(data.id),
+    orderId: String(data.order_id ?? ''),
+    paymentMethod: data.payment_method as Payment['paymentMethod'],
+    amountPaid: Number(data.amount_paid ?? 0),
+    paymentStatus: data.payment_status as Payment['paymentStatus'],
+    referenceNumber: (data.reference_number as string | null | undefined) ?? null,
+    createdAt: String(data.created_at ?? new Date().toISOString()),
+  } satisfies Payment;
 }
 
 export async function createStaff(input: { email: string; password: string; fullName: string; role: StaffProfile['role'] }) {

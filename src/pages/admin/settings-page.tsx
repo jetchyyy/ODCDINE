@@ -17,6 +17,7 @@ const defaultValues: SettingsFormValues = {
   taxRate: 0.12,
   serviceChargeRate: 0.1,
   currency: 'PHP',
+  queueResetAfter: 50,
   logoUrl: null,
   openingHours: defaultOpeningHours,
 };
@@ -41,6 +42,7 @@ export function AdminSettingsPage() {
         taxRate: data.taxRate,
         serviceChargeRate: data.serviceChargeRate,
         currency: data.currency,
+        queueResetAfter: data.queueResetAfter,
         logoUrl: data.logoUrl ?? null,
         openingHours: data.openingHours,
       });
@@ -94,6 +96,18 @@ export function AdminSettingsPage() {
           <label className="mb-2 block text-sm font-medium text-slate-700">Currency</label>
           <input {...form.register('currency')} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 uppercase outline-none focus:border-amber-700" />
           <FormError message={form.formState.errors.currency?.message} />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium text-slate-700">Queue Reset After</label>
+          <input
+            {...form.register('queueResetAfter', { valueAsNumber: true })}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-amber-700"
+            type="number"
+            min="1"
+            step="1"
+          />
+          <FormError message={form.formState.errors.queueResetAfter?.message} />
+          <p className="mt-2 text-xs leading-5 text-slate-500">Example: set to `50` so the next queue after 050 becomes 001 again.</p>
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-700">Tax rate</label>

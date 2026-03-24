@@ -8,6 +8,7 @@ export const settingsSchema = z.object({
   taxRate: z.number().min(0).max(1),
   serviceChargeRate: z.number().min(0).max(1),
   currency: z.string().trim().min(3).max(3),
+  queueResetAfter: z.number().int().min(1).max(9999),
   logoUrl: z.string().url().nullable().optional(),
   openingHours: z.object(
     Object.fromEntries(weekdays.map((day) => [day, z.string().trim().min(3).max(30)])) as Record<
