@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DataTable } from '../../components/ui/data-table';
 import { EmptyState } from '../../components/ui/empty-state';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
@@ -11,6 +11,7 @@ import type { Order } from '../../types/domain';
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 export function AdminSalesPage() {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [tableFilter, setTableFilter] = useState('all');
@@ -101,9 +102,15 @@ export function AdminSalesPage() {
               render: (order) => (
                 <div>
                   {order.queueNumber ? <p className="text-xs uppercase tracking-[0.25em] text-emerald-700">Queue {order.queueNumber}</p> : null}
-                  <Link to={`/admin/orders/${order.id}`} className="font-semibold text-slate-900">
+                  <button
+                    className="font-semibold text-slate-900"
+                    onClick={() => {
+                      void navigate(`/admin/orders/${order.id}`);
+                    }}
+                    type="button"
+                  >
                     {order.orderNumber}
-                  </Link>
+                  </button>
                   <p className="mt-1 text-xs text-slate-500">{new Date(order.createdAt).toLocaleString()}</p>
                 </div>
               ),

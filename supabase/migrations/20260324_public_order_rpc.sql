@@ -109,8 +109,8 @@ begin
 
   select coalesce(sum(line_total), 0)
   into v_subtotal
-  from public.order_items
-  where order_id = v_order_id;
+  from public.order_items oi
+  where oi.order_id = v_order_id;
 
   update public.orders
   set
@@ -124,7 +124,7 @@ begin
   values (v_order_id, 'pending', null);
 
   return query
-  select v_order_id, v_order_number;
+  select v_order_id as order_id, v_order_number as order_number;
 end;
 $$;
 
@@ -180,3 +180,4 @@ $$;
 
 grant execute on function public.create_public_order(text, jsonb, text) to anon, authenticated;
 grant execute on function public.get_public_order(uuid) to anon, authenticated;
+

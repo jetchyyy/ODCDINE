@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 import { CategoryTabs } from '../../components/menu/category-tabs';
 import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { DataTable } from '../../components/ui/data-table';
@@ -714,9 +713,15 @@ export function AdminOrdersPage() {
             render: (order) => (
               <div>
                 {order.queueNumber ? <p className="text-xs uppercase tracking-[0.25em] text-amber-700">Queue {order.queueNumber}</p> : null}
-                <Link to={`/admin/orders/${order.id}`} className="font-semibold text-slate-900">
+                <button
+                  className="font-semibold text-slate-900"
+                  onClick={() => {
+                    void navigate(`/admin/orders/${order.id}`);
+                  }}
+                  type="button"
+                >
                   {order.orderNumber}
-                </Link>
+                </button>
                 <p className="mt-1 text-xs text-slate-500">{new Date(order.createdAt).toLocaleString()}</p>
               </div>
             ),
