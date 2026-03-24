@@ -68,6 +68,7 @@ export function useOrders() {
   return useQuery({
     queryKey: queryKeys.orders,
     queryFn: fetchOrders,
+    refetchInterval: 3_000,
   });
 }
 
@@ -90,6 +91,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: queryKeys.analytics,
     queryFn: fetchAnalytics,
+    refetchInterval: 5_000,
   });
 }
 

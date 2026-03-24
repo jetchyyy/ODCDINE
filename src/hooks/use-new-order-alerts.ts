@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '../lib/constants/query-keys';
-import { supabase } from '../lib/supabase/client';
-import { fetchOrderById } from '../services/supabase/queries';
+import { useOrders } from './use-dashboard-queries';
 import type { Order, StaffRole } from '../types/domain';
 
 const speechStorageKey = 'odcdine-speech-enabled';
@@ -41,71 +37,58 @@ function speakNewOrder(order: Order) {
 }
 
 export function useNewOrderAlerts(role?: StaffRole | null) {
-  const queryClient = useQueryClient();
+  const { data: orders = [] } = useOrders();
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [speechEnabled, setSpeechEnabled] = useState(loadSpeechPreference);
-  const seenOrderIdsRef = useRef(new Set<string>());
+  const knownOrderIdsRef = useRef(new Set<string>());
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     saveSpeechPreference(speechEnabled);
   }, [speechEnabled]);
 
   useEffect(() => {
-    if (!supabase || !role) {
+    if (!role) {
       return;
     }
 
-    const client = supabase;
-    let mounted = true;
+    if (!initializedRef.current) {
+      for (const order of orders) {
+        knownOrderIdsRef.current.add(order.id);
+      }
+      initializedRef.current = true;
+      return;
+    }
 
-    const channel: RealtimeChannel = client
-      .channel(`new-order-alerts-${role}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-        },
-        async (payload) => {
-          const newRow = payload.new as { id?: string; source?: string; status?: string } | null;
-          const orderId = newRow?.id;
+    const newlySeenOrders = orders.filter((order) => !knownOrderIdsRef.current.has(order.id));
 
-          if (!orderId || newRow?.source !== 'qr' || newRow?.status !== 'pending' || seenOrderIdsRef.current.has(orderId)) {
-            return;
-          }
+    for (const order of orders) {
+      knownOrderIdsRef.current.add(order.id);
+    }
 
-          seenOrderIdsRef.current.add(orderId);
+    const newestPendingQrOrder = newlySeenOrders
+      .filter((order) => order.source === 'qr' && order.status === 'pending')
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 
-          await queryClient.invalidateQueries({ queryKey: queryKeys.orders });
-          await queryClient.invalidateQueries({ queryKey: queryKeys.analytics });
+    if (!newestPendingQrOrder) {
+      return;
+    }
 
-          const order = await queryClient.fetchQuery({
-            queryKey: queryKeys.order(orderId),
-            queryFn: () => fetchOrderById(orderId),
-          });
+    setActiveOrder(newestPendingQrOrder);
 
-          if (!mounted || !order) {
-            return;
-          }
+    if (speechEnabled) {
+      speakNewOrder(newestPendingQrOrder);
+    }
+  }, [orders, role, speechEnabled]);
 
-          setActiveOrder(order);
-
-          if (speechEnabled) {
-            speakNewOrder(order);
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      mounted = false;
-      void client.removeChannel(channel);
+  useEffect(
+    () => () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-    };
-  }, [queryClient, role, speechEnabled]);
+    },
+    [],
+  );
 
   return {
     activeOrder,
