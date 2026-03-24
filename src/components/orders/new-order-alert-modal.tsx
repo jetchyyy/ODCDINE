@@ -6,9 +6,11 @@ interface NewOrderAlertModalProps {
   area: 'admin' | 'kitchen';
   order: Order | null;
   onClose: () => void;
+  onConfirm: (orderId: string) => void;
+  confirmPending?: boolean;
 }
 
-export function NewOrderAlertModal({ area, order, onClose }: NewOrderAlertModalProps) {
+export function NewOrderAlertModal({ area, order, onClose, onConfirm, confirmPending }: NewOrderAlertModalProps) {
   if (!order) {
     return null;
   }
@@ -46,6 +48,14 @@ export function NewOrderAlertModal({ area, order, onClose }: NewOrderAlertModalP
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
+            disabled={confirmPending}
+            onClick={() => onConfirm(order.id)}
+            type="button"
+          >
+            {confirmPending ? 'Confirming...' : 'Confirm order'}
+          </button>
           <Link
             className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white"
             onClick={onClose}

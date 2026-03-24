@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { NewOrderAlertModal } from '../orders/new-order-alert-modal';
 import { useAuth } from '../../features/auth/use-auth';
+import { useUpdateOrderStatus } from '../../hooks/use-dashboard-queries';
 import { useNewOrderAlerts } from '../../hooks/use-new-order-alerts';
 import { Header } from './header';
 import { Sidebar } from './sidebar';
@@ -12,6 +13,12 @@ interface AppLayoutProps {
 export function AppLayout({ area }: AppLayoutProps) {
   const { profile } = useAuth();
   const { activeOrder, speechEnabled, dismissAlert, toggleSpeech } = useNewOrderAlerts(profile?.role);
+  const updateOrderStatusMutation = useUpdateOrderStatus();
+
+  async function handleConfirmOrder(orderId: string) {
+    await updateOrderStatusMutation.mutateAsync({ orderId, status: 'confirmed' });
+    dismissAlert();
+  }
 
   return (
     <>
@@ -26,7 +33,15 @@ export function AppLayout({ area }: AppLayoutProps) {
           </main>
         </div>
       </div>
-      <NewOrderAlertModal area={area} order={activeOrder} onClose={dismissAlert} />
+      <NewOrderAlertModal
+        area={area}
+        order={activeOrder}
+        onClose={dismissAlert}
+        onConfirm={(orderId) => {
+          void handleConfirmOrder(orderId);
+        }}
+        confirmPending={updateOrderStatusMutation.isPending}
+      />
     </>
   );
 }
