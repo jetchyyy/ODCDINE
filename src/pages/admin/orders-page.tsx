@@ -346,12 +346,15 @@ export function AdminOrdersPage() {
   const pageStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageEnd = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
   const canDeleteOrders = profile?.role === 'admin';
-  const pageOrderIds = pagedOrders.map((order) => order.id);
+  const pageOrderIds = useMemo(() => pagedOrders.map((order) => order.id), [pagedOrders]);
   const allPageOrdersSelected = pageOrderIds.length > 0 && pageOrderIds.every((orderId) => selectedOrderIds.includes(orderId));
   const selectedCount = selectedOrderIds.length;
 
   useEffect(() => {
-    setSelectedOrderIds((currentIds) => currentIds.filter((orderId) => pageOrderIds.includes(orderId)));
+    setSelectedOrderIds((currentIds) => {
+      const nextIds = currentIds.filter((orderId) => pageOrderIds.includes(orderId));
+      return nextIds.length === currentIds.length ? currentIds : nextIds;
+    });
   }, [pageOrderIds]);
 
   useEffect(() => {
