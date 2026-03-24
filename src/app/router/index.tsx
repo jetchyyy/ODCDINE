@@ -24,6 +24,7 @@ function withRoles(element: React.ReactNode, allowedRoles: typeof STAFF_PORTAL_R
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/admin/dashboard" replace /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/t/:tableCode', element: <MenuPage /> },
   { path: '/menu/:tableCode', element: <MenuPage /> },
   { path: '/cart/:tableCode', element: <CartPage /> },
   { path: '/track/:orderId', element: <TrackOrderPage /> },

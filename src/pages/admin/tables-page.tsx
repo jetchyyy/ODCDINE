@@ -23,6 +23,10 @@ function getPublicSiteUrl() {
   return configuredUrl && configuredUrl.length > 0 ? configuredUrl.replace(/\/+$/, '') : window.location.origin;
 }
 
+function buildTableQrUrl(publicSiteUrl: string, tableCode: string) {
+  return `${publicSiteUrl}/t/${tableCode}`;
+}
+
 function downloadQrForTable(table: RestaurantTable, qrUrl: string) {
   const canvas = document.createElement('canvas');
   const size = 640;
@@ -152,7 +156,7 @@ export function AdminTablesPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {data.length > 0 ? (
             data.map((table) => {
-              const qrUrl = `${publicSiteUrl}/menu/${table.tableCode}`;
+              const qrUrl = buildTableQrUrl(publicSiteUrl, table.tableCode);
               return (
                 <div key={table.id} onMouseEnter={() => setSelectedTableId(table.id)}>
                   <TableCard
@@ -162,7 +166,7 @@ export function AdminTablesPage() {
                     onToggleActive={(value) => {
                       void toggleMutation.mutateAsync({ tableId: value.id, isActive: !value.isActive });
                     }}
-                    onDownload={(value) => downloadQrForTable(value, `${publicSiteUrl}/menu/${value.tableCode}`)}
+                    onDownload={(value) => downloadQrForTable(value, buildTableQrUrl(publicSiteUrl, value.tableCode))}
                   />
                 </div>
               );
@@ -174,7 +178,7 @@ export function AdminTablesPage() {
         <div className="space-y-4">
           {selectedTable ? (
             <>
-              <QRCodePreview value={`${publicSiteUrl}/menu/${selectedTable.tableCode}`} title={`${selectedTable.tableName} QR`} />
+              <QRCodePreview value={buildTableQrUrl(publicSiteUrl, selectedTable.tableCode)} title={`${selectedTable.tableName} QR`} />
               <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white" onClick={() => window.print()} type="button">
                 Print QR sheet
               </button>
