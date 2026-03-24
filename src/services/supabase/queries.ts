@@ -172,6 +172,7 @@ function mapOrder(row: SupabaseRow): Order {
   return {
     id: String(row.id),
     tableId: (row.table_id as string | null | undefined) ?? null,
+    tableCode: (table?.table_code as string | null | undefined) ?? null,
     tableName: String(table?.table_name ?? (row.source === 'staff' ? 'Walk-in / No table' : 'Unknown Table')),
     tableNumber: table?.table_number ? Number(table.table_number) : undefined,
     orderNumber: String(row.order_number ?? ''),
@@ -506,7 +507,7 @@ export async function fetchOrderById(orderId: string) {
   const client = requireSupabase();
   const { data, error } = await client
     .from('orders')
-    .select('*, tables(table_name, table_number), order_items(*), order_status_logs(*, profiles(full_name)), payments(*)')
+    .select('*, tables(table_name, table_number, table_code), order_items(*), order_status_logs(*, profiles(full_name)), payments(*)')
     .eq('id', orderId)
     .maybeSingle();
 

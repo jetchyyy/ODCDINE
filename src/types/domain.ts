@@ -120,6 +120,7 @@ export interface Payment {
 export interface Order {
   id: string;
   tableId?: string | null;
+  tableCode?: string | null;
   tableName: string;
   tableNumber?: number;
   orderNumber: string;

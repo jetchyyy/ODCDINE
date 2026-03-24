@@ -147,7 +147,9 @@ as $$
     'source', o.source,
     'created_at', o.created_at,
     'tables', jsonb_build_object(
-      'table_name', t.table_name
+      'table_name', t.table_name,
+      'table_number', t.table_number,
+      'table_code', t.table_code
     ),
     'order_items', coalesce(
       (

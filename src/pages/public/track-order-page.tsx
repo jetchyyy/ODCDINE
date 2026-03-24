@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { EmptyState } from '../../components/ui/empty-state';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { StatusBadge } from '../../components/ui/status-badge';
@@ -36,6 +36,13 @@ export function TrackOrderPage() {
           <p className="mt-4 text-sm leading-6 text-slate-600">
             Your order status updates live as staff confirm, prepare, and serve the items.
           </p>
+          {order.tableCode ? (
+            <div className="mt-6 flex justify-center">
+              <Link to={`/menu/${order.tableCode}`} className="rounded-full bg-amber-700 px-5 py-3 text-sm font-semibold text-white">
+                Order again
+              </Link>
+            </div>
+          ) : null}
         </div>
 
         <div className="glass-panel p-6">
